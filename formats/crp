@@ -1,0 +1,31 @@
+#City Skylines File
+
+@crp
+  crap s 4
+  version H
+  size_of_steam_id B
+  steam_id s size_of_steam_id
+
+  size_of_unknown1 B
+  unknown1 s size_of_unknown1
+
+  unknown2 I
+
+  size_of_name_of_mod B
+  name_of_mod s size_of_name_of_mod
+
+  number_of_files I
+  end_header_offset Q
+
+  CHUNK file_headers number_of_files
+    size_of_file_name B
+    file_name s size_of_file_name
+    size_of_unknown4 B
+    unknown4 s size_of_unknown4
+
+    unknown5 I
+    offset_from_header Q
+    file_size Q
+  END
+
+RETURN
