@@ -5,9 +5,10 @@ This is a simple tool to extract .crp files for Cities: Skylines. As of right no
  * Python 2.7 https://www.python.org/downloads/
 
 ##Usage:
- * You will be prompted to input type in the file name in the console when you launch the program. Don't forget the .crp extension.
+ * Run crp_extract.py. You will be prompted to type in the name of the CRP file you want to extract. Don't forget the .crp extension.
 
 ##Key for first bytes:
+These are the values for the first bytes of each type of file contained in a CRP file. They are probably used as a quick guide for the game to tell which files are which.
  * 0x53 - Assembly-CSharp
  * 0x54 - UnityEngine.Mesh
  * 0x57 - BuildingInfoGen

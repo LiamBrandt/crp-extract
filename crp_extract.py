@@ -12,6 +12,8 @@ def main():
     data = get_formatted_data(bin_file, "crp", "crp")
 
     name_of_mod = get_raw(data["name_of_mod"], bin_file)
+    if name_of_mod == "":
+        name_of_mod = file_name[:-4]
     output_path = "./" + name_of_mod + "/"
     if not os.path.exists(output_path):
         os.makedirs(output_path)
@@ -26,13 +28,22 @@ def main():
         offset_from_header = get_raw(file_header["offset_from_header"], bin_file)
         file_size = get_raw(file_header["file_size"], bin_file)
 
-        absolute_offset = offset_from_header+end_header_offset+1
+        #absolute_offset = offset_from_header+end_header_offset+1
+        absolute_offset = offset_from_header+end_header_offset
 
         bin_file.seek(absolute_offset)
         try:
             id_string = unpack(bin_file, "s", 48).lower()
         except:
             id_string = ""
+
+        #manually search for PNG header in data
+        png_header = [137, 80, 78, 71, 13, 10, 26, 10]
+        bin_file.seek(absolute_offset)
+        found_header = True
+        for i in range(8):
+            if unpack(bin_file, "B") != png_header[i]:
+                found_header = False
 
         #TEXTURE2D
         if "unityengine.texture2d" in id_string:
@@ -64,8 +75,8 @@ def main():
                     break
 
         #STEAM PREVIEW PNG
-        elif "icolossalframework.importers.image" in id_string:
-            print("found steam preview png")
+        elif "icolossalframework.importers.image" in id_string or found_header:
+            print("found png")
             bin_file.seek(absolute_offset)
 
             png_string = ""
