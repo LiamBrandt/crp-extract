@@ -74,7 +74,7 @@ def main():
                     final_size = file_size - meta_size
                     break
 
-        #STEAM PREVIEW PNG
+        #STEAM PREVIEW PNG (AND RANDOM PNGS)
         elif "icolossalframework.importers.image" in id_string or found_header:
             print("found png")
             bin_file.seek(absolute_offset)
