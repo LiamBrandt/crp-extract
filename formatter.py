@@ -2,6 +2,7 @@ import struct
 import sys
 import time
 import os
+import io
 
 INDICES = {}
 
@@ -243,7 +244,9 @@ def get_raw(bin_list, bin_file, return_to_pos=True, tracer=None):
 def get_formatted_data(bin_file, format_name, pattern_name):
     global MARKERS
 
-    format_file = open("./formats/" + format_name, "r")
+    #this is the wrong way to open the format_file, newlines can be unexpected, user io.open()
+    #format_file = open("./formats/" + format_name, "r")
+    format_file = io.open("./formats/" + format_name, "r", newline=None)
 
     format_file.seek(0, os.SEEK_END)
     format_file_size = format_file.tell()
