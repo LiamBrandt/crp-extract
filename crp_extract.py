@@ -5,8 +5,13 @@ from formatter import get_formatted_data
 from formatter import get_raw
 from formatter import unpack
 
+try:
+    input = raw_input
+except NameError:
+    pass
+
 def main():
-    file_name = raw_input("FILE NAME: ")
+    file_name = input("FILE NAME: ")
     bin_file = open(file_name, "rb")
 
     data = get_formatted_data(bin_file, "crp", "crp")
@@ -14,7 +19,7 @@ def main():
     name_of_mod = get_raw(data["name_of_mod"], bin_file)
     if name_of_mod == "":
         name_of_mod = file_name[:-4]
-    output_path = "./" + name_of_mod + "/"
+    output_path = "./" + name_of_mod.decode('utf-8') + "/"
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
@@ -24,7 +29,7 @@ def main():
 
     #go through each file found
     for file_header in data["file_headers"]:
-        file_name = get_raw(file_header["file_name"], bin_file)
+        file_name = get_raw(file_header["file_name"], bin_file).decode('utf-8')
         offset_from_header = get_raw(file_header["offset_from_header"], bin_file)
         file_size = get_raw(file_header["file_size"], bin_file)
 
@@ -33,7 +38,7 @@ def main():
 
         bin_file.seek(absolute_offset)
         try:
-            id_string = unpack(bin_file, "s", 48).lower()
+            id_string = str(unpack(bin_file, "s", 48)).lower()
         except:
             id_string = ""
 
@@ -121,7 +126,7 @@ def main():
             metadata[final_path] = ""
         else:
             bin_file.seek(meta_offset)
-            metadata[final_path] = unpack(bin_file, "s", meta_size).decode('utf-8','ignore').encode("utf-8")
+            metadata[final_path] = unpack(bin_file, "s", meta_size).decode('utf-8','ignore')
 
         #write file
         write_file = open(final_path, "wb")

@@ -230,7 +230,7 @@ def get_raw(bin_list, bin_file, return_to_pos=True, tracer=None):
             raw = unpack(bin_file, form[:1], length_arg)
         else:
             raw = unpack(bin_file, form[:1])
-    except Exception, e:
+    except Exception as e:
         print(str(e))
         #print("get_raw() returned ERROR!")
         raw = "ERROR"
