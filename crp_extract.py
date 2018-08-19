@@ -1,25 +1,42 @@
+import argparse
 import os
+import os.path
 import json
 
 from formatter import get_formatted_data
 from formatter import get_raw
 from formatter import unpack
 
-try:
-    input = raw_input
-except NameError:
-    pass
+
+HERE = os.path.dirname(__file__)
+
+
+def argparse_valid_directory_type(value):
+    abs_path = os.path.abspath(value)
+    if not os.path.isdir(abs_path):
+        raise argparse.ArgumentTypeError("{0} is not a valid directory".format(abs_path))
+    return abs_path
+
+
+parser = argparse.ArgumentParser(description="Unpack Colossal Raw Package (.crp) files")
+parser.add_argument("file", type=argparse.FileType("rb"),
+                    help="The file to unpack")
+parser.add_argument("--output-dir", type=argparse_valid_directory_type, default=".",
+                    help="The directory to put the unpacked files into (Default: current working directory)")
+
 
 def main():
-    file_name = input("FILE NAME: ")
-    bin_file = open(file_name, "rb")
+    args = parser.parse_args()
+
+    file_name = args.file.name
+    bin_file = args.file
 
     data = get_formatted_data(bin_file, "crp", "crp")
 
-    name_of_mod = get_raw(data["name_of_mod"], bin_file)
+    name_of_mod = get_raw(data.get("name_of_mod", ""), bin_file)
     if name_of_mod == "":
         name_of_mod = file_name[:-4]
-    output_path = "./" + name_of_mod.decode('utf-8') + "/"
+    output_path = os.path.join(args.output_dir, name_of_mod.decode('utf-8'))
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
@@ -74,7 +91,7 @@ def main():
                     meta_offset = absolute_offset
                     meta_size = dds_offset - absolute_offset
 
-                    final_path = output_path + file_name + ".dds"
+                    final_path = os.path.join(output_path, file_name + '.dds')
                     final_offset = dds_offset
                     final_size = file_size - meta_size
                     break
@@ -105,7 +122,7 @@ def main():
                     meta_offset = absolute_offset
                     meta_size = png_offset - absolute_offset
 
-                    final_path = output_path + file_name + ".png"
+                    final_path = os.path.join(output_path, file_name + ".png")
                     final_offset = png_offset
                     final_size = file_size - meta_size
                     break
@@ -116,7 +133,7 @@ def main():
             meta_offset = absolute_offset
             meta_size = 0
 
-            final_path = output_path + file_name
+            final_path = os.path.join(output_path, file_name)
             final_offset = absolute_offset
             final_size = file_size
 
@@ -140,4 +157,6 @@ def main():
     with open(output_path + "metadata.json", "w") as f:
         json.dump(metadata, f, indent=4, sort_keys=True)
 
-main()
+
+if __name__ == '__main__':
+    main()
