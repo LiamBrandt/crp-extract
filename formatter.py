@@ -2,7 +2,11 @@ import struct
 import sys
 import time
 import os
+import os.path
 import io
+
+
+HERE = os.path.dirname(__file__)
 
 INDICES = {}
 
@@ -246,7 +250,8 @@ def get_formatted_data(bin_file, format_name, pattern_name):
 
     #this is the wrong way to open the format_file, newlines can be unexpected, user io.open()
     #format_file = open("./formats/" + format_name, "r")
-    format_file = io.open("./formats/" + format_name, "r", newline=None)
+    format_file_path = os.path.join(HERE, 'formats', format_name)
+    format_file = io.open(format_file_path, "r", newline=None)
 
     format_file.seek(0, os.SEEK_END)
     format_file_size = format_file.tell()
