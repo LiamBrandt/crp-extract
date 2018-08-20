@@ -154,7 +154,7 @@ def main():
         write_file.close()
 
     #save the metadata dictionary using json
-    with open(output_path + "metadata.json", "w") as f:
+    with open(os.path.join(output_path, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=4, sort_keys=True)
 
 
