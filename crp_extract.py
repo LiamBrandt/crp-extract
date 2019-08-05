@@ -146,6 +146,7 @@ def main():
             metadata[final_path] = unpack(bin_file, "s", meta_size).decode('utf-8','ignore')
 
         #write file
+        os.makedirs(os.path.dirname(final_path), exist_ok=True)
         write_file = open(final_path, "wb")
         write_file.truncate()
 
