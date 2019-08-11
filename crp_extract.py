@@ -1,4 +1,5 @@
 import argparse
+import errno
 import os
 import json
 
@@ -12,7 +13,7 @@ def make_directories_for(path):
     try:
         os.makedirs(path)
     except OSError as exc:
-        if exc.errno == os.errno.EEXIST and os.path.isdir(path):
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
             pass
         else:
             raise
@@ -146,7 +147,7 @@ def main():
 
     metadata = {
         "version": get_raw(data["version"], file),
-        "steam_id": get_raw(data["steam_id"], file),
+        "steam_id": get_raw(data["steam_id"], file).decode("utf-8"),
         "number_of_files": get_raw(data["number_of_files"], file),
         "file_metadata": file_metadata
     }
