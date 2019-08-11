@@ -85,7 +85,7 @@ def main():
 
     end_header_offset = get_raw(data["end_header_offset"], file)
 
-    metadata = {}
+    file_metadata = {}
 
     # Go through each file from the header
     for file_header in data["file_headers"]:
@@ -121,7 +121,7 @@ def main():
                 file_size - relative_offset,
                 file_path
             )
-            metadata[file_path] = string_at(file, file_offset, relative_offset)
+            file_metadata[file_path] = string_at(file, file_offset, relative_offset)
         # PNG
         elif "icolossalframework.importers.image" in id_string or is_png:
             file_path = os.path.join(output_path, file_name + '.png')
@@ -133,7 +133,7 @@ def main():
                 file_size - relative_offset,
                 file_path
             )
-            metadata[file_path] = string_at(file, file_offset, relative_offset)
+            file_metadata[file_path] = string_at(file, file_offset, relative_offset)
         # Other
         else:
             slice_and_write_file(
@@ -143,7 +143,14 @@ def main():
                 os.path.join(output_path, file_name)
             )
 
-    # Save the metadata dictionary as json
+
+    metadata = {
+        "version": get_raw(data["version"], file),
+        "steam_id": get_raw(data["steam_id"], file),
+        "number_of_files": get_raw(data["number_of_files"], file),
+        "file_metadata": file_metadata
+    }
+    # Save the metadata as json
     meta_path = os.path.join(output_path, "metadata.json")
     make_directories_for(meta_path)
     with open(meta_path, "w") as f:
