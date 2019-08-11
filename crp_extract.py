@@ -1,15 +1,21 @@
 import argparse
 import os
-import os.path
 import json
 
 from formatter import get_formatted_data
 from formatter import get_raw
 from formatter import unpack
 
-
-HERE = os.path.dirname(__file__)
-
+# Safely make directories necessary to save something at the given path
+def make_directories_for(path):
+    path = os.path.dirname(path)
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == os.errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
 
 def argparse_valid_directory_type(value):
     abs_path = os.path.abspath(value)
@@ -17,147 +23,131 @@ def argparse_valid_directory_type(value):
         raise argparse.ArgumentTypeError("{0} is not a valid directory".format(abs_path))
     return abs_path
 
+# Return a string from the file
+def string_at(file, offset, size):
+    file.seek(offset)
+    return unpack(file, "s", size).decode("utf-8", "ignore")
 
-parser = argparse.ArgumentParser(description="Unpack Colossal Raw Package (.crp) files")
-parser.add_argument("file", type=argparse.FileType("rb"),
-                    help="The file to unpack")
-parser.add_argument("--output-dir", type=argparse_valid_directory_type, default=".",
-                    help="The directory to put the unpacked files into (Default: current working directory)")
+# Slice part of the given file and write it to file at the given path
+def slice_and_write_file(file, offset, size, path):
+    make_directories_for(path)
+    write_file = open(path, "wb")
+    write_file.truncate()
 
+    file.seek(offset)
+    write_file.write(file.read(size))
+    write_file.close()
+
+# Return the relative offset from the offset in the file of the first sequence
+# of bytes that match. Return None if there is no matching sequence.
+def first_sequence(file, offset, sequence, exactly_first=False):
+    file.seek(offset)
+    index = 0
+    while(True):
+        value = unpack(file, "B")
+        # Next byte matches
+        if value == sequence[index]:
+            index += 1
+            # We read the whole sequence so return the offset from the offset
+            if index == len(sequence):
+                return file.tell() - offset - len(sequence)
+        # Next byte does not match
+        else:
+            # Try this byte one more time from the start of the sequence if
+            # we were in the middle before.
+            if index != 0:
+                index = 0
+                file.seek(-1, os.SEEK_CUR)
+        # If we are searching for the sequence exactly at the start and it
+        # is not at the exact start then return None.
+        if exactly_first and file.tell() - offset > len(sequence):
+            return None
+        # TODO: handle hitting the end of the file and returning None
 
 def main():
+    parser = argparse.ArgumentParser(description="Unpack Colossal Raw Package (.crp) files")
+    parser.add_argument("file", type=argparse.FileType("rb"),
+                        help="The file to unpack")
+    parser.add_argument("--output-dir", type=argparse_valid_directory_type, default=".",
+                        help="The directory to put the unpacked files into (Default: current working directory)")
     args = parser.parse_args()
 
     file_name = args.file.name
-    bin_file = args.file
+    file = args.file
 
-    data = get_formatted_data(bin_file, "crp", "crp")
+    data = get_formatted_data(file, "crp", "crp")
 
-    name_of_mod = get_raw(data.get("name_of_mod", ""), bin_file)
+    name_of_mod = get_raw(data.get("name_of_mod", ""), file)
+    # If there is no mod name default to the file name
     if name_of_mod == "":
         name_of_mod = file_name[:-4]
     output_path = os.path.join(args.output_dir, name_of_mod.decode('utf-8'))
-    if not os.path.exists(output_path):
-        os.makedirs(output_path)
 
-    end_header_offset = get_raw(data["end_header_offset"], bin_file)
+    end_header_offset = get_raw(data["end_header_offset"], file)
 
     metadata = {}
 
-    #go through each file found
+    # Go through each file from the header
     for file_header in data["file_headers"]:
-        file_name = get_raw(file_header["file_name"], bin_file).decode('utf-8')
-        offset_from_header = get_raw(file_header["offset_from_header"], bin_file)
-        file_size = get_raw(file_header["file_size"], bin_file)
+        file_name = get_raw(file_header["file_name"], file).decode('utf-8')
+        offset_from_header = get_raw(file_header["offset_from_header"], file)
+        file_size = get_raw(file_header["file_size"], file)
 
-        #absolute_offset = offset_from_header+end_header_offset+1
-        absolute_offset = offset_from_header+end_header_offset
+        file_offset = offset_from_header + end_header_offset
 
-        bin_file.seek(absolute_offset)
+        # Try to read a special descriptive string at the start of the file
+        file.seek(file_offset)
         try:
-            id_string = str(unpack(bin_file, "s", 48)).lower()
+            id_string = str(unpack(file, "s", 48)).lower()
         except:
             id_string = ""
 
-        #manually search for PNG header in data
-        png_header = [137, 80, 78, 71, 13, 10, 26, 10]
-        bin_file.seek(absolute_offset)
-        found_header = True
-        for i in range(8):
-            if unpack(bin_file, "B") != png_header[i]:
-                found_header = False
+        # Check for PNG header at start of file
+        is_png = first_sequence(
+            file,
+            file_offset,
+            [137, 80, 78, 71, 13, 10, 26, 10],
+            exactly_first=True
+        )
 
-        #TEXTURE2D
+        # DDS
         if "unityengine.texture2d" in id_string:
-            print("found texture2d")
-            bin_file.seek(absolute_offset)
-
-            dds_string = ""
-            #find "DDS " in the file to mark the start of the dds
-            while(True):
-                value = unpack(bin_file, "B")
-                if value == 68:
-                    dds_string += "D"
-                elif value == 83:
-                    dds_string += "S"
-                elif value == 32:
-                    dds_string += " "
-                else:
-                    dds_string = ""
-
-                if dds_string == "DDS ":
-                    dds_offset = bin_file.tell()-4
-
-                    meta_offset = absolute_offset
-                    meta_size = dds_offset - absolute_offset
-
-                    final_path = os.path.join(output_path, file_name + '.dds')
-                    final_offset = dds_offset
-                    final_size = file_size - meta_size
-                    break
-
-        #STEAM PREVIEW PNG (AND RANDOM PNGS)
-        elif "icolossalframework.importers.image" in id_string or found_header:
-            print("found png")
-            bin_file.seek(absolute_offset)
-
-            png_string = ""
-            #find "PNG" in the file to mark the start of the png
-            while(True):
-                value = unpack(bin_file, "B")
-                if value == 137:
-                    png_string += "89"
-                elif value == 80:
-                    png_string += "50"
-                elif value == 78:
-                    png_string += "4E"
-                elif value == 71:
-                    png_string += "47"
-                else:
-                    png_string = ""
-
-                if png_string == "89504E47":
-                    png_offset = bin_file.tell()-4
-
-                    meta_offset = absolute_offset
-                    meta_size = png_offset - absolute_offset
-
-                    final_path = os.path.join(output_path, file_name + ".png")
-                    final_offset = png_offset
-                    final_size = file_size - meta_size
-                    break
-
-        #GENERIC
+            file_path = os.path.join(output_path, file_name + '.dds')
+            relative_offset = first_sequence(file, file_offset, [68, 68, 83, 32])
+            # Slice starting at "DDS "
+            slice_and_write_file(
+                file,
+                file_offset + relative_offset,
+                file_size - relative_offset,
+                file_path
+            )
+            metadata[file_path] = string_at(file, file_offset, relative_offset)
+        # PNG
+        elif "icolossalframework.importers.image" in id_string or is_png:
+            file_path = os.path.join(output_path, file_name + '.png')
+            relative_offset = first_sequence(file, file_offset, [137, 80, 78, 71])
+            # Slice starting at PNG header
+            slice_and_write_file(
+                file,
+                file_offset + relative_offset,
+                file_size - relative_offset,
+                file_path
+            )
+            metadata[file_path] = string_at(file, file_offset, relative_offset)
+        # Other
         else:
-            print("found generic")
-            meta_offset = absolute_offset
-            meta_size = 0
+            slice_and_write_file(
+                file,
+                file_offset,
+                file_size,
+                os.path.join(output_path, file_name)
+            )
 
-            final_path = os.path.join(output_path, file_name)
-            final_offset = absolute_offset
-            final_size = file_size
-
-
-        #add metadata to the metadata dictionary
-        if meta_size == 0:
-            metadata[final_path] = ""
-        else:
-            bin_file.seek(meta_offset)
-            metadata[final_path] = unpack(bin_file, "s", meta_size).decode('utf-8','ignore')
-
-        #write file
-        os.makedirs(os.path.dirname(final_path), exist_ok=True)
-        write_file = open(final_path, "wb")
-        write_file.truncate()
-
-        bin_file.seek(final_offset)
-        write_file.write(bin_file.read(final_size))
-        write_file.close()
-
-    #save the metadata dictionary using json
-    with open(os.path.join(output_path, "metadata.json"), "w") as f:
+    # Save the metadata dictionary as json
+    meta_path = os.path.join(output_path, "metadata.json")
+    make_directories_for(meta_path)
+    with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=4, sort_keys=True)
-
 
 if __name__ == '__main__':
     main()
